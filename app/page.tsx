@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
-import MovieCard from "../components/MovieCard"
-import AddMovieModal from "../components/AddMovieModal"
+import { useRouter } from "next/navigation"
+import MovieCard from "@/components/MovieCard"
+import AddMovieModal from "@/components/AddMovieModal"
+import Navbar from "@/components/Navbar"
 
 type Movie = {
   id: string
@@ -24,6 +26,13 @@ export default function Home() {
   const [filterGenre, setFilterGenre] = useState("")
   const [filterMood, setFilterMood] = useState("")
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) router.push("/login")
+    })
+  }, [])
 
   const fetchMovies = async () => {
     setLoading(true)
@@ -40,8 +49,7 @@ export default function Home() {
   }
 
   const handleDelete = async (id: string) => {
-    const confirm = window.confirm("Hapus film ini?")
-    if (!confirm) return
+    if (!window.confirm("Hapus film ini?")) return
     await supabase.from("movies").delete().eq("id", id)
     fetchMovies()
   }
@@ -52,19 +60,9 @@ export default function Home() {
 
   useEffect(() => {
     let result = movies
-
-    if (search) {
-      result = result.filter((m) =>
-        m.title.toLowerCase().includes(search.toLowerCase())
-      )
-    }
-    if (filterGenre) {
-      result = result.filter((m) => m.genre === filterGenre)
-    }
-    if (filterMood) {
-      result = result.filter((m) => m.mood === filterMood)
-    }
-
+    if (search) result = result.filter((m) => m.title.toLowerCase().includes(search.toLowerCase()))
+    if (filterGenre) result = result.filter((m) => m.genre === filterGenre)
+    if (filterMood) result = result.filter((m) => m.mood === filterMood)
     setFiltered(result)
   }, [search, filterGenre, filterMood, movies])
 
@@ -72,85 +70,66 @@ export default function Home() {
   const moods = [...new Set(movies.map((m) => m.mood).filter(Boolean))]
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white px-6 py-10">
-      {/* Header */}
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-black tracking-tight text-yellow-400">
-              🎬 CineLog
-            </h1>
-            <p className="text-zinc-400 text-sm mt-1">
-              {movies.length} film dalam watchlist kamu
-            </p>
+    <>
+      <Navbar />
+      <main className="min-h-screen bg-zinc-950 text-white px-6 py-10">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <p className="text-zinc-400 text-sm">{movies.length} film dalam watchlist kamu</p>
+            <button
+              onClick={() => setShowModal(true)}
+              className="bg-yellow-400 text-black font-bold px-5 py-2 rounded-xl hover:bg-yellow-300 transition-colors"
+            >
+              + Tambah Film
+            </button>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="bg-yellow-400 text-black font-bold px-5 py-2 rounded-xl hover:bg-yellow-300 transition-colors"
-          >
-            + Tambah Film
-          </button>
+
+          <div className="flex flex-wrap gap-3 mb-8">
+            <input
+              type="text"
+              placeholder="🔍 Cari film..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="bg-zinc-800 text-white rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400 flex-1 min-w-[200px]"
+            />
+            <select
+              value={filterGenre}
+              onChange={(e) => setFilterGenre(e.target.value)}
+              className="bg-zinc-800 text-white rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400"
+            >
+              <option value="">Semua Genre</option>
+              {genres.map((g) => <option key={g} value={g}>{g}</option>)}
+            </select>
+            <select
+              value={filterMood}
+              onChange={(e) => setFilterMood(e.target.value)}
+              className="bg-zinc-800 text-white rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400"
+            >
+              <option value="">Semua Mood</option>
+              {moods.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+
+          {loading ? (
+            <div className="text-center text-zinc-400 py-20">Loading...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center text-zinc-500 py-20">
+              <p className="text-5xl mb-4">🎞️</p>
+              <p>Belum ada film. Yuk tambah yang pertama!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+              {filtered.map((movie) => (
+                <MovieCard key={movie.id} movie={movie} onDelete={handleDelete} />
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Search & Filter */}
-        <div className="flex flex-wrap gap-3 mb-8">
-          <input
-            type="text"
-            placeholder="🔍 Cari film..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="bg-zinc-800 text-white rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400 flex-1 min-w-[200px]"
-          />
-          <select
-            value={filterGenre}
-            onChange={(e) => setFilterGenre(e.target.value)}
-            className="bg-zinc-800 text-white rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400"
-          >
-            <option value="">Semua Genre</option>
-            {genres.map((g) => (
-              <option key={g} value={g}>{g}</option>
-            ))}
-          </select>
-          <select
-            value={filterMood}
-            onChange={(e) => setFilterMood(e.target.value)}
-            className="bg-zinc-800 text-white rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400"
-          >
-            <option value="">Semua Mood</option>
-            {moods.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Movie Grid */}
-        {loading ? (
-          <div className="text-center text-zinc-400 py-20">Loading...</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center text-zinc-500 py-20">
-            <p className="text-5xl mb-4">🎞️</p>
-            <p>Belum ada film. Yuk tambah yang pertama!</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-            {filtered.map((movie) => (
-              <MovieCard
-                key={movie.id}
-                movie={movie}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
+        {showModal && (
+          <AddMovieModal onClose={() => setShowModal(false)} onAdded={fetchMovies} />
         )}
-      </div>
-
-      {/* Modal */}
-      {showModal && (
-        <AddMovieModal
-          onClose={() => setShowModal(false)}
-          onAdded={fetchMovies}
-        />
-      )}
-    </main>
+      </main>
+    </>
   )
 }
