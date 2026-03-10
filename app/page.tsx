@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import MovieCard from "@/components/MovieCard"
 import AddMovieModal from "@/components/AddMovieModal"
+import EditMovieModal from "@/components/EditMovieModal"
 import Navbar from "@/components/Navbar"
 
 type Movie = {
@@ -22,6 +23,7 @@ export default function Home() {
   const [movies, setMovies] = useState<Movie[]>([])
   const [filtered, setFiltered] = useState<Movie[]>([])
   const [showModal, setShowModal] = useState(false)
+  const [editMovie, setEditMovie] = useState<Movie | null>(null)
   const [search, setSearch] = useState("")
   const [filterGenre, setFilterGenre] = useState("")
   const [filterMood, setFilterMood] = useState("")
@@ -120,7 +122,7 @@ export default function Home() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
               {filtered.map((movie) => (
-                <MovieCard key={movie.id} movie={movie} onDelete={handleDelete} />
+                <MovieCard key={movie.id} movie={movie} onDelete={handleDelete} onEdit={(movie) => setEditMovie(movie)} />
               ))}
             </div>
           )}
@@ -129,6 +131,13 @@ export default function Home() {
         {showModal && (
           <AddMovieModal onClose={() => setShowModal(false)} onAdded={fetchMovies} />
         )}
+        {editMovie && (
+          <EditMovieModal
+            movie={editMovie}
+            onClose={() => setEditMovie(null)}
+            onUpdated={fetchMovies}
+          />
+)}
       </main>
     </>
   )
