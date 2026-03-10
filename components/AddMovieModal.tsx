@@ -1,3 +1,5 @@
+"use client"
+
 import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 
@@ -12,24 +14,61 @@ const genreOptions = ["Action", "Comedy", "Drama", "Horror", "Romance", "Sci-Fi"
 export default function AddMovieModal({ onClose, onAdded }: Props) {
   const [form, setForm] = useState({
     title: "",
-    poster_url: "",
     genre: "",
     rating: 5,
     review: "",
     mood: "",
     watch_date: "",
   })
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
+  const handleImageFile = (file: File) => {
+    if (!file.type.startsWith("image/")) return alert("File harus berupa gambar!")
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleImageFile(file)
+  }
+
   const handleSubmit = async () => {
     if (!form.title) return alert("Judul film wajib diisi!")
     setLoading(true)
 
-    const { error } = await supabase.from("movies").insert([form])
+    const { data: userData } = await supabase.auth.getUser()
+    const user_id = userData.user?.id
+
+    let poster_url = ""
+
+    if (imageFile) {
+      const ext = imageFile.name.split(".").pop()
+      const fileName = `${user_id}_${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from("posters")
+        .upload(fileName, imageFile)
+
+      if (uploadError) {
+        alert("Gagal upload gambar: " + uploadError.message)
+        setLoading(false)
+        return
+      }
+
+      const { data: urlData } = supabase.storage.from("posters").getPublicUrl(fileName)
+      poster_url = urlData.publicUrl
+    }
+
+    const { error } = await supabase.from("movies").insert([{ ...form, poster_url, user_id }])
 
     if (error) {
       alert("Gagal menambahkan film: " + error.message)
@@ -41,24 +80,42 @@ export default function AddMovieModal({ onClose, onAdded }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-zinc-900 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl my-auto">
         <h2 className="text-white text-xl font-bold">🎬 Tambah Film</h2>
+
+        {/* Image Upload */}
+        <div
+          onDrop={handleDrop}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onClick={() => document.getElementById("poster-input")?.click()}
+          className={`w-full h-40 rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors overflow-hidden ${
+            dragging ? "border-yellow-400 bg-yellow-400/10" : "border-zinc-600 hover:border-yellow-400"
+          }`}
+        >
+          {imagePreview ? (
+            <img src={imagePreview} className="w-full h-full object-cover" />
+          ) : (
+            <div className="text-center text-zinc-500 text-sm">
+              <p className="text-2xl mb-1">🖼️</p>
+              <p>Drop poster di sini atau klik untuk pilih</p>
+            </div>
+          )}
+        </div>
+        <input
+          id="poster-input"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleImageFile(e.target.files[0])}
+        />
 
         {/* Title */}
         <input
           name="title"
           placeholder="Judul film *"
           value={form.title}
-          onChange={handleChange}
-          className="w-full bg-zinc-800 text-white rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400"
-        />
-
-        {/* Poster URL */}
-        <input
-          name="poster_url"
-          placeholder="URL poster (opsional)"
-          value={form.poster_url}
           onChange={handleChange}
           className="w-full bg-zinc-800 text-white rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400"
         />
@@ -71,9 +128,7 @@ export default function AddMovieModal({ onClose, onAdded }: Props) {
           className="w-full bg-zinc-800 text-white rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400"
         >
           <option value="">Pilih genre</option>
-          {genreOptions.map((g) => (
-            <option key={g} value={g}>{g}</option>
-          ))}
+          {genreOptions.map((g) => <option key={g} value={g}>{g}</option>)}
         </select>
 
         {/* Rating */}
