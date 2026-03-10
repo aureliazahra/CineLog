@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
-import MovieCard from "./components/MovieCard"
-import AddMovieModal from "./components/AddMovieModal"
+import MovieCard from "../components/MovieCard"
+import AddMovieModal from "../components/AddMovieModal"
 
 type Movie = {
   id: string
